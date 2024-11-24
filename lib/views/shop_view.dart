@@ -17,18 +17,26 @@ class ShopView extends StatefulWidget {
 class _ShopViewState extends State<ShopView> {
   final ProductController controller = ProductController();
   late Future<List<Product>> futureProducts;
-  bool isFavorite = false;
+  late List<Product> allProducts; // Danh sách tất cả sản phẩm
+  List<Product> filteredProducts = []; // Danh sách sản phẩm sau khi tìm kiếm
+  final TextEditingController searchController = TextEditingController();
+
   int _selectedIndex = 1;
 
   @override
   void initState() {
     super.initState();
     futureProducts = controller.fetchProducts();
+    futureProducts.then((products) {
+      setState(() {
+        allProducts = products;
+        filteredProducts = products; // Hiển thị toàn bộ sản phẩm ban đầu
+      });
+    });
   }
 
   void _onItemTapped(int index) {
     if (index == 0) {
-      // Check if "Home" is selected
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -50,6 +58,19 @@ class _ShopViewState extends State<ShopView> {
     }
   }
 
+  void _filterProducts(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        filteredProducts = allProducts;
+      } else {
+        filteredProducts = allProducts
+            .where((product) =>
+                product.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,6 +81,8 @@ class _ShopViewState extends State<ShopView> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: TextField(
+                controller: searchController,
+                onChanged: _filterProducts, // Lọc sản phẩm theo từ khóa
                 decoration: InputDecoration(
                   hintText: 'Search in here',
                   prefixIcon: Icon(Icons.search),
@@ -82,82 +105,7 @@ class _ShopViewState extends State<ShopView> {
               ),
             ),
 
-            // Category Section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Shop by Category',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          'View All',
-                          style: TextStyle(
-                            color: Colors.green,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment
-                        .spaceEvenly, // Đặt các mục cách đều nhau
-                    children: [
-                      _buildCategoryItem(
-                          'Popular', 'assets/images/giay.png', true),
-                      _buildCategoryItem('Men', 'assets/images/men.png', false),
-                      _buildCategoryItem(
-                          'Women', 'assets/images/woman.png', false),
-                      _buildCategoryItem(
-                          'Kids', 'assets/images/kid.png', false),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Recommended Section
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Recommended',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'View All',
-                      style: TextStyle(
-                        color: Colors.green,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Product Grid
+            // Danh sách sản phẩm
             Expanded(
               child: FutureBuilder<List<Product>>(
                 future: futureProducts,
@@ -166,10 +114,9 @@ class _ShopViewState extends State<ShopView> {
                     return Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  } else if (!snapshot.hasData || allProducts.isEmpty) {
                     return Center(child: Text('No products available'));
                   } else {
-                    final products = snapshot.data!;
                     return GridView.builder(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -178,9 +125,9 @@ class _ShopViewState extends State<ShopView> {
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
-                      itemCount: products.length,
+                      itemCount: filteredProducts.length,
                       itemBuilder: (context, index) {
-                        final product = products[index];
+                        final product = filteredProducts[index];
                         return _buildProductCard(product);
                       },
                     );
@@ -209,50 +156,9 @@ class _ShopViewState extends State<ShopView> {
     );
   }
 
-  Widget _buildCategoryItem(String title, String imagePath, bool isSelected) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? Colors.green : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(2), // Padding for the inner circle
-              child: ClipOval(
-                child: Image.asset(
-                  imagePath,
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: isSelected ? Colors.green : Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildProductCard(Product product) {
     return InkWell(
       onTap: () {
-        // Điều hướng đến ProductDetailView khi nhấn vào sản phẩm
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -278,30 +184,11 @@ class _ShopViewState extends State<ShopView> {
                 ),
                 Positioned(
                   top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.star, size: 16, color: Colors.amber),
-                        SizedBox(width: 4),
-                        Text('4.9'),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
                   right: 8,
                   child: GestureDetector(
                     onTap: () {
                       setState(() {
-                        isFavorite =
-                            !isFavorite; // Thay đổi trạng thái khi nhấn
+                        product.isFavorite = !product.isFavorite;
                       });
                     },
                     child: Container(
@@ -311,15 +198,11 @@ class _ShopViewState extends State<ShopView> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        isFavorite
+                        product.isFavorite
                             ? Icons.favorite
-                            : Icons
-                                .favorite_border, // Đổi icon khi trạng thái thay đổi
+                            : Icons.favorite_border,
                         size: 20,
-                        color: isFavorite
-                            ? Colors.red
-                            : Colors
-                                .black, // Đổi màu icon khi trạng thái thay đổi
+                        color: product.isFavorite ? Colors.red : Colors.black,
                       ),
                     ),
                   ),
@@ -352,3 +235,4 @@ class _ShopViewState extends State<ShopView> {
     );
   }
 }
+
